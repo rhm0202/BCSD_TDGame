@@ -13,10 +13,17 @@ public class TowerWeapon : MonoBehaviour
     private float attackRate = 0.5f;              // 공격 속도
     [SerializeField]
     private float attackRange = 2.0f;             // 공격 범위
+    [SerializeField]
+    private int attackDamage = 1;               // 공격력
+    private int level = 0;                                       // 타워 레벨
+    private WeaponState weaponState = WeaponState.SearchTarget;  // 타워 무기의 상태
+    private Transform attackTarget = null;                       // 공격 대상
+    private EnemySpawner enemySpawner;                           // 게임에 존재하는 적 정보 획득용
 
-    private WeaponState weaponState = WeaponState.SearchTarget; // 타워 무기의 상태
-    private Transform attackTarget = null;        // 타겟 적
-    private EnemySpawner enemySpawner;            // 게임에 존재하는 적 정보 획득용
+    public float Damage => attackDamage;
+    public float Rate   => attackRate;
+    public float Range  => attackRange;
+    public int   Level  => level + 1;
 
     public void Setup(EnemySpawner enemySpawner)
     {
@@ -120,6 +127,6 @@ public class TowerWeapon : MonoBehaviour
     {
         GameObject clone = Instantiate(projectilePrefab, spawnPoint.position, Quaternion.identity);
         // 생성된 발사체에게 공격대상(attackTarget) 정보 제공
-        clone.GetComponent<Projectile>().Setup(attackTarget);
+        clone.GetComponent<Projectile>().Setup(attackTarget, attackDamage);
     }
 }

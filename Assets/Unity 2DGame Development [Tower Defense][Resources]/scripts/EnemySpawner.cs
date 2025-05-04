@@ -4,44 +4,120 @@ using UnityEngine;
 
 public class EnemySpawner : MonoBehaviour
 {
+    //[SerializeField]
+    //private GameObject enemyPrefab;           // 적 프리팹
     [SerializeField]
-    private GameObject enemyPrefab;   // 적 프리팹
+    private GameObject enemyHPSliderPrefab;   // 적 체력을 나타내는 Slider UI 프리팹
     [SerializeField]
-    private float spawnTime;          // 적 생성 주기
+    private Transform canvasTransform;        // UI를 표현하는 Canvas 오브젝트의 Transform
     [SerializeField]
+    //private float spawnTime;          // 적 생성 주기
+    //[SerializeField]
     private Transform[] wayPoints;    // 현재 스테이지의 이동 경로
+    [SerializeField]
+    private PlayerHP playerHP;    // 현재 스테이지의 이동 경로
+    [SerializeField]
+    private PlayerGold playerGold;    // 현재 스테이지의 이동 경로
+
+    private Wave currentWave;
+    private int currentEnemyCount;
     private List<Enemy> enemyList;                // 현재 맵에 존재하는 모든 적의 정보
 
     // 적의 생성과 삭제는 EnemySpawner에서 하기 때문에 Set은 필요 없다.
     public List<Enemy> EnemyList => enemyList;
 
+    // 현재 웨이브의 남아있는 적, 최대 적 숫자
+    public int CurrentEnemyCount => currentEnemyCount;
+    public int MaxEnemyCount => currentWave.maxEnemyCount;
+
     private void Awake()
     {
         enemyList = new List<Enemy>();
         // 적 생성 코루틴 함수 호출
+        //StartCoroutine("SpawnEnemy");
+    }
+
+    public void StartWave(Wave wave)
+    {
+        // 매개변수로 받아온 웨이브 정보 저장
+        currentWave = wave;
+
+        currentEnemyCount = currentWave.maxEnemyCount;
+
+        // 실제 웨이브 시작
         StartCoroutine("SpawnEnemy");
     }
 
     private IEnumerator SpawnEnemy()
     {
-        while (true)
+        int spawnEnemyCount = 0;
+
+        // 현재 웨이브에서 생성되어야 하는 적의 수만큼 적을 생성하고 코루틴 종료
+        while (spawnEnemyCount < currentWave.maxEnemyCount)
         {
-            GameObject clone = Instantiate(enemyPrefab);        // 적 오브젝트 생성
-            Enemy enemy = clone.GetComponent<Enemy>();          // 방금 생성된 적의 Enemy 컴포넌트
+            // 적 오브젝트 생성
+            // enemyIndex = 현재 웨이브에 존재하는 적 프리팹 중 랜덤한 인덱스
+            int enemyIndex = Random.Range(0, currentWave.enemyPrefabs.Length);
+            GameObject clone = Instantiate(currentWave.enemyPrefabs[enemyIndex]);
 
-            enemy.Setup(this, wayPoints);                             // wayPoint 정보를 매개변수로 Setup() 호출
-            enemyList.Add(enemy);                               // 리스트에 방금 생성된 적 정보 저장
+            // Enemy 컴포넌트 가져오기
+            Enemy enemy = clone.GetComponent<Enemy>();
 
-            yield return new WaitForSeconds(spawnTime);         // spawnTime 시간 동안 대기
+            // this는 자신 (EnemySpawner 클래스)
+            // wayPoint 정보를 매개변수로 Setup() 호출
+            // 리스트에 방금 생성된 적 정보 저장
+            enemy.Setup(this, wayPoints);
+            enemyList.Add(enemy);
+
+            // 적 체력바 UI 생성 및 설정
+            SpawnEnemyHPSlider(clone);
+
+            // 생성된 적 수 증가
+            spawnEnemyCount++;
+
+            // spawnTime 시간 동안 대기
+            yield return new WaitForSeconds(currentWave.spawnTime);
         }
     }
 
-    public void DestroyEnemy(Enemy enemy)
+    public void DestroyEnemy(EnemyDestroyType type, Enemy enemy, int gold)
     {
+        // 적이 목표지점까지 도착했을 때
+        if (type == EnemyDestroyType.Arrive)
+        {
+            // 플레이어의 체력 -1
+            playerHP.TakeDamage(1);
+        }
+        else if (type == EnemyDestroyType.kill)
+        {
+            // 적의 종류에 따라 사망 시 골드 획득
+            playerGold.CurrentGold += gold;
+        }
+
+        currentEnemyCount--;
         // 리스트에서 사망하는 적 정보 삭제
         enemyList.Remove(enemy);
 
         // 적 오브젝트 삭제
         Destroy(enemy.gameObject);
+    }
+
+    private void SpawnEnemyHPSlider(GameObject enemy)
+    {
+        // 적 체력을 나타내는 Slider UI 생성
+        GameObject sliderClone = Instantiate(enemyHPSliderPrefab);
+
+        // Slider UI 인스턴스를 parent("Canvas" 오브젝트)의 자식으로 설정
+        // Tip. UI는 캔버스의 자식으로 설정되어 있어야 화면에 보인다
+        sliderClone.transform.SetParent(canvasTransform);
+    
+        // 계층 설정으로 바뀐 크기를 다시 (1, 1, 1)로 설정
+        sliderClone.transform.localScale = Vector3.one;
+
+        // Slider UI가 쫓아다닐 대상을 본인의 위치로 설정
+        sliderClone.GetComponent<SliderPositionAutoSetter>().Setup(enemy.transform);
+
+        // Slider UI가 자신의 체력 정보를 표시하도록 설정
+        sliderClone.GetComponent<EnemyHPViewer>().Setup(enemy.GetComponent<EnemyHP>());
     }
 }
